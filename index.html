@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Charge Check</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0b1220" />
+<style>
+  :root{
+    --bg:#0b1220; --panel:#131c2e; --panel2:#1a2438; --border:#26324a;
+    --text:#e8edf5; --muted:#8fa0bd; --accent:#38bdf8; --good:#34d399; --bad:#f87171; --warn:#fbbf24;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:16px 16px 48px; max-width:520px; margin-inline:auto;
+  }
+  h1{font-size:1.4rem; margin:4px 0 2px;}
+  .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
+  .tabs{display:flex; gap:6px; margin-bottom:16px; background:var(--panel); padding:4px; border-radius:12px;}
+  .tab{flex:1; text-align:center; padding:10px 6px; border-radius:9px; font-size:0.85rem; font-weight:600; color:var(--muted); cursor:pointer; user-select:none;}
+  .tab.active{background:var(--accent); color:#04141f;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:14px;}
+  label{display:block; font-size:0.8rem; color:var(--muted); margin:12px 0 5px;}
+  label:first-child{margin-top:0;}
+  select, input[type=number]{
+    width:100%; padding:12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--panel2); color:var(--text); font-size:1rem;
+  }
+  select:focus, input:focus{outline:2px solid var(--accent);}
+  .row{display:flex; gap:10px;}
+  .row > div{flex:1;}
+  button.calc{
+    width:100%; margin-top:16px; padding:14px; border:none; border-radius:12px;
+    background:var(--accent); color:#04141f; font-size:1rem; font-weight:700; cursor:pointer;
+  }
+  button.calc:active{opacity:0.85;}
+  .result{margin-top:14px; border-radius:12px; padding:16px; display:none;}
+  .result.show{display:block;}
+  .result .verdict{font-size:1.15rem; font-weight:800; margin-bottom:8px;}
+  .result .line{display:flex; justify-content:space-between; font-size:0.92rem; padding:4px 0; border-bottom:1px dashed rgba(255,255,255,0.08);}
+  .result .line:last-child{border-bottom:none;}
+  .result.good{background:rgba(52,211,153,0.12); border:1px solid var(--good);}
+  .result.good .verdict{color:var(--good);}
+  .result.bad{background:rgba(248,113,113,0.12); border:1px solid var(--bad);}
+  .result.bad .verdict{color:var(--bad);}
+  .hint{font-size:0.78rem; color:var(--muted); margin-top:10px; line-height:1.4;}
+  .lookup-out{margin-top:14px; font-size:1.6rem; font-weight:800; text-align:center; color:var(--accent);}
+  .disclaimer{font-size:0.72rem; color:var(--muted); text-align:center; margin-top:24px; line-height:1.5;}
+  footer{text-align:center; color:var(--muted); font-size:0.72rem; margin-top:10px;}
+</style>
+</head>
+<body>
+
+<h1>⚡ Charge Check</h1>
+<div class="sub">Superheat / subcooling calculator + PT lookup, built for the field.</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="fo">Fixed Orifice</div>
+  <div class="tab" data-tab="txv">TXV</div>
+  <div class="tab" data-tab="pt">PT Lookup</div>
+</div>
+
+<!-- Refrigerant picker shared across tabs -->
+<div class="card">
+  <label for="refrigerant">Refrigerant</label>
+  <select id="refrigerant">
+    <option value="R410A">R-410A</option>
+    <option value="R32">R-32</option>
+    <option value="R22">R-22</option>
+    <option value="R454B">R-454B</option>
+    <option value="R404A">R-404A</option>
+    <option value="R134A">R-134A</option>
+  </select>
+</div>
+
+<!-- FIXED ORIFICE / SUPERHEAT -->
+<div class="panel" id="panel-fo">
+  <div class="card">
+    <label for="fo-lowside">Low side (suction) pressure — PSIG</label>
+    <input type="number" id="fo-lowside" inputmode="decimal" placeholder="e.g. 132" />
+
+    <label for="fo-suctemp">Suction line temp at the bulb (°F)</label>
+    <input type="number" id="fo-suctemp" inputmode="decimal" placeholder="e.g. 58" />
+
+    <div class="row">
+      <div>
+        <label for="fo-wb">Indoor wet bulb (°F)</label>
+        <input type="number" id="fo-wb" inputmode="decimal" placeholder="e.g. 63" />
+      </div>
+      <div>
+        <label for="fo-db">Outdoor dry bulb (°F)</label>
+        <input type="number" id="fo-db" inputmode="decimal" placeholder="e.g. 92" />
+      </div>
+    </div>
+
+    <button class="calc" onclick="calcFO()">Calculate Superheat</button>
+    <div class="result" id="fo-result"></div>
+    <div class="hint">Fixed orifice / piston metering devices. Target superheat is refrigerant-independent — it's driven by indoor wet bulb and outdoor dry bulb.</div>
+  </div>
+</div>
+
+<!-- TXV / SUBCOOLING -->
+<div class="panel" id="panel-txv" style="display:none;">
+  <div class="card">
+    <label for="txv-highside">High side (liquid) pressure — PSIG</label>
+    <input type="number" id="txv-highside" inputmode="decimal" placeholder="e.g. 391" />
+
+    <label for="txv-liqtemp">Liquid line temp at the bulb (°F)</label>
+    <input type="number" id="txv-liqtemp" inputmode="decimal" placeholder="e.g. 108" />
+
+    <label for="txv-target">Target subcooling (°F) — check the unit's data plate</label>
+    <input type="number" id="txv-target" inputmode="decimal" value="10" />
+
+    <button class="calc" onclick="calcTXV()">Calculate Subcooling</button>
+    <div class="result" id="txv-result"></div>
+    <div class="hint">TXV / EEV metering devices. Target subcooling is manufacturer-specified (commonly 8–12°F) — use the data plate value when you've got it, not the 10°F default.</div>
+  </div>
+</div>
+
+<!-- PT LOOKUP -->
+<div class="panel" id="panel-pt" style="display:none;">
+  <div class="card">
+    <label for="pt-mode">Convert</label>
+    <select id="pt-mode">
+      <option value="t2p">Temp (°F) → Pressure (PSIG)</option>
+      <option value="p2t">Pressure (PSIG) → Temp (°F)</option>
+    </select>
+    <label for="pt-input" id="pt-input-label">Temperature (°F)</label>
+    <input type="number" id="pt-input" inputmode="decimal" placeholder="e.g. 70" oninput="calcPT()" />
+    <div class="lookup-out" id="pt-out">—</div>
+    <div class="hint" id="pt-hint"></div>
+  </div>
+</div>
+
+<div class="disclaimer">
+  Field diagnostic aid only — not a substitute for manufacturer specs, proper safety procedures, or your own judgment on the system in front of you. PT data sourced from published manufacturer charts; R-454B and R-404A are zeotropic blends with glide, values are per bubble/dew point as noted.
+</div>
+<footer>Charge Check · works offline once loaded</footer>
+
+<script>
+// ---------- PT chart data (°F -> PSIG), verified from published manufacturer charts ----------
+const PT = {
+  R410A: [[-40,10.8],[-35,14.1],[-30,17.8],[-25,21.9],[-20,26.3],[-15,31.2],[-10,36.5],[-5,42.2],[0,48.4],[5,55.2],[10,62.4],[15,70.3],[20,78.7],[25,87.7],[30,97.4],[35,107.7],[40,118.8],[45,130.6],[50,143.2],[55,156.5],[60,170.7],[65,185.8],[70,201.8],[75,218.7],[80,236.5],[85,255.4],[90,275.4],[95,296.4],[100,318.5],[105,341.9],[110,366.8],[115,392.3],[120,419.4],[125,447.9],[130,477.9],[135,509.4],[140,542.5],[145,577.3],[150,613.9]],
+  R32: [[-40,11.0],[-35,14.4],[-30,18.2],[-25,22.3],[-20,26.8],[-15,31.7],[-10,37.1],[-5,42.9],[0,49.3],[5,56.1],[10,63.5],[15,71.5],[20,80.0],[25,89.2],[30,99.1],[35,109.7],[40,121.0],[45,133.0],[50,145.8],[55,159.5],[60,174.1],[65,189.5],[70,205.8],[75,223.2],[80,241.5],[85,260.9],[90,281.3],[95,302.9],[100,325.7],[105,349.6],[110,374.9],[115,401.4],[120,429.3],[125,458.7],[130,489.5],[135,521.8],[140,555.8],[145,591.4],[150,628.8]],
+  R22: [[-40,0.6],[-35,2.6],[-30,4.9],[-25,7.4],[-20,10.2],[-15,13.2],[-10,16.5],[-5,20.1],[0,24.0],[5,28.3],[10,32.8],[15,37.8],[20,43.1],[25,48.8],[30,55.0],[35,61.5],[40,68.6],[45,76.1],[50,84.1],[55,92.6],[60,101.6],[65,111.3],[70,121.4],[75,132.2],[80,143.6],[85,155.7],[90,168.4],[95,181.8],[100,195.9],[105,210.8],[110,226.4],[115,242.8],[120,260],[125,278],[130,296.9],[135,316.7],[140,337.4],[145,359.0],[150,381.7]],
+  // R-454B is a zeotropic blend with real glide: bubble (liquid, high-side/condenser) and dew (vapor, low-side/evaporator) differ.
+  R454B_bubble: [[-40,9.9],[-35,13.2],[-30,16.7],[-25,20.6],[-20,24.9],[-15,29.5],[-10,34.6],[-5,40.1],[0,46.1],[5,52.5],[10,59.5],[15,66.9],[20,75.0],[25,83.6],[30,92.9],[35,102.8],[40,113.3],[45,124.6],[50,136.6],[55,149.4],[60,162.9],[65,177.3],[70,192.5],[75,208.6],[80,225.6],[85,243.6],[90,262.5],[95,282.5],[100,303.6],[105,325.7],[110,348.9],[115,373.4],[120,399.1],[125,426.0],[130,454.2],[135,483.8],[140,514.9],[145,547.3],[150,581.4]],
+  R454B_dew: [[-40,8.8],[-35,11.9],[-30,15.3],[-25,19.0],[-20,23.0],[-15,27.5],[-10,32.3],[-5,37.6],[0,43.3],[5,49.4],[10,56.1],[15,63.2],[20,70.9],[25,79.2],[30,88.1],[35,97.6],[40,107.7],[45,118.5],[50,130.1],[55,142.3],[60,155.4],[65,169.3],[70,184.0],[75,199.6],[80,216.1],[85,233.5],[90,251.9],[95,271.4],[100,291.6],[105,313.6],[110,336.4],[115,360.5],[120,385.8],[125,412.4],[130,440.5],[135,470.0],[140,501.0],[145,533.7],[150,568.2]],
+  // R-404A also has mild glide; using the published liquid (bubble) column for both sides as a close field approximation.
+  R404A: [[-40,4.9],[-35,7.5],[-30,10.3],[-25,13.4],[-20,16.8],[-15,20.5],[-10,24.6],[-5,28.9],[0,33.7],[5,38.8],[10,44.3],[15,50.2],[20,56.6],[25,63.4],[30,70.7],[35,78.6],[40,86.9],[45,95.8],[50,105.3],[55,115.3],[60,126.0],[65,137.3],[70,149.3],[75,162.0],[80,175.4],[85,189.5],[90,204.5],[95,220.2],[100,236.8],[105,254.2],[110,272.5],[115,291.8],[120,312.1],[125,333.3],[130,355.7],[135,379.1],[140,403.7],[145,429.6],[150,456.8]],
+  // R-134A: table starts at -15°F (~0 psig / atmospheric). Below that the refrigerant is under vacuum, which is
+  // outside the range this tool supports (and outside any normal AC/refrigeration operating condition anyway).
+  R134A: [[-15,0.1],[-10,1.9],[-5,4.1],[0,6.5],[5,9.1],[10,11.9],[15,15.0],[20,18.4],[25,22.1],[30,26.1],[35,30.4],[40,35.0],[45,40.1],[50,45.4],[55,51.2],[60,57.4],[65,64.0],[70,71.1],[75,78.7],[80,86.7],[85,95.2],[90,104.3],[95,114.0],[100,124.2],[105,135.0],[110,146.4],[115,158.4],[120,171.2],[125,184.6],[130,198.7],[135,213.6],[140,229.2],[145,245.7],[150,262.9]]
+};
+
+function tableFor(ref, side){
+  // side: "low" (evaporator/dew) or "high" (condenser/bubble)
+  if(ref === "R454B") return side === "high" ? PT.R454B_bubble : PT.R454B_dew;
+  return PT[ref];
+}
+
+function interp(table, x, xi, yi){
+  // generic linear interpolation over an array of [a,b] pairs, xi/yi pick which index is the input/output (0 or 1)
+  if(x <= table[0][xi]) {
+    const [a,b] = table[0], [c,d] = table[1];
+    const p = [a,b], q=[c,d];
+    return lerp(p[xi],p[yi],q[xi],q[yi],x);
+  }
+  const last = table[table.length-1];
+  if(x >= last[xi]){
+    const p = table[table.length-2], q = last;
+    return lerp(p[xi],p[yi],q[xi],q[yi],x);
+  }
+  for(let i=0;i<table.length-1;i++){
+    const p = table[i], q = table[i+1];
+    if(x >= p[xi] && x <= q[xi]) return lerp(p[xi],p[yi],q[xi],q[yi],x);
+  }
+  return null;
+}
+function lerp(x1,y1,x2,y2,x){
+  if(x2 === x1) return y1;
+  return y1 + (y2-y1) * (x-x1)/(x2-x1);
+}
+function tempFromPressure(table, psig){ return interp(table, psig, 1, 0); }
+function pressureFromTemp(table, tempF){ return interp(table, tempF, 0, 1); }
+
+// ---------- Tabs ----------
+const tabs = document.querySelectorAll(".tab");
+const panels = { fo: document.getElementById("panel-fo"), txv: document.getElementById("panel-txv"), pt: document.getElementById("panel-pt") };
+tabs.forEach(t => t.addEventListener("click", () => {
+  tabs.forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  Object.keys(panels).forEach(k => panels[k].style.display = (k === t.dataset.tab) ? "block" : "none");
+}));
+
+// ---------- Fixed orifice / superheat ----------
+function calcFO(){
+  const ref = document.getElementById("refrigerant").value;
+  const lowside = parseFloat(document.getElementById("fo-lowside").value);
+  const suctemp = parseFloat(document.getElementById("fo-suctemp").value);
+  const wb = parseFloat(document.getElementById("fo-wb").value);
+  const db = parseFloat(document.getElementById("fo-db").value);
+  const box = document.getElementById("fo-result");
+
+  if([lowside,suctemp,wb,db].some(v => isNaN(v))){
+    box.className = "result show bad";
+    box.innerHTML = "<div class='verdict'>Fill in all four fields</div>";
+    return;
+  }
+
+  const table = tableFor(ref, "low");
+  const evapSat = tempFromPressure(table, lowside);
+  const actualSH = suctemp - evapSat;
+  const targetSH = (3*wb - 80 - db) / 2;
+  const diff = actualSH - targetSH;
+  const margin = 5;
+
+  let verdict, cls;
+  if(Math.abs(diff) <= margin){ verdict = "✅ Charge looks correct"; cls = "good"; }
+  else if(diff > margin){ verdict = "⚠️ Likely UNDERCHARGED"; cls = "bad"; }
+  else { verdict = "⚠️ Likely OVERCHARGED"; cls = "bad"; }
+
+  box.className = "result show " + cls;
+  box.innerHTML = `
+    <div class="verdict">${verdict}</div>
+    <div class="line"><span>Evaporator sat. temp</span><span>${evapSat.toFixed(1)}°F</span></div>
+    <div class="line"><span>Actual superheat</span><span>${actualSH.toFixed(1)}°F</span></div>
+    <div class="line"><span>Target superheat</span><span>${targetSH.toFixed(1)}°F</span></div>
+    <div class="line"><span>Difference</span><span>${diff>0?"+":""}${diff.toFixed(1)}°F</span></div>
+  `;
+}
+
+// ---------- TXV / subcooling ----------
+function calcTXV(){
+  const ref = document.getElementById("refrigerant").value;
+  const highside = parseFloat(document.getElementById("txv-highside").value);
+  const liqtemp = parseFloat(document.getElementById("txv-liqtemp").value);
+  const target = parseFloat(document.getElementById("txv-target").value);
+  const box = document.getElementById("txv-result");
+
+  if([highside,liqtemp,target].some(v => isNaN(v))){
+    box.className = "result show bad";
+    box.innerHTML = "<div class='verdict'>Fill in all fields</div>";
+    return;
+  }
+
+  const table = tableFor(ref, "high");
+  const condSat = tempFromPressure(table, highside);
+  const actualSC = condSat - liqtemp;
+  const diff = actualSC - target;
+  const margin = 3;
+
+  let verdict, cls;
+  if(Math.abs(diff) <= margin){ verdict = "✅ Charge looks correct"; cls = "good"; }
+  else if(diff < -margin){ verdict = "⚠️ Likely UNDERCHARGED"; cls = "bad"; }
+  else { verdict = "⚠️ Likely OVERCHARGED"; cls = "bad"; }
+
+  box.className = "result show " + cls;
+  box.innerHTML = `
+    <div class="verdict">${verdict}</div>
+    <div class="line"><span>Condenser sat. temp</span><span>${condSat.toFixed(1)}°F</span></div>
+    <div class="line"><span>Actual subcooling</span><span>${actualSC.toFixed(1)}°F</span></div>
+    <div class="line"><span>Target subcooling</span><span>${target.toFixed(1)}°F</span></div>
+    <div class="line"><span>Difference</span><span>${diff>0?"+":""}${diff.toFixed(1)}°F</span></div>
+  `;
+}
+
+// ---------- PT lookup ----------
+document.getElementById("pt-mode").addEventListener("change", () => {
+  const mode = document.getElementById("pt-mode").value;
+  document.getElementById("pt-input-label").textContent = mode === "t2p" ? "Temperature (°F)" : "Pressure (PSIG)";
+  document.getElementById("pt-input").value = "";
+  document.getElementById("pt-out").textContent = "—";
+  document.getElementById("pt-hint").textContent = "";
+});
+document.getElementById("refrigerant").addEventListener("change", () => { calcPT(); });
+
+function calcPT(){
+  const ref = document.getElementById("refrigerant").value;
+  const mode = document.getElementById("pt-mode").value;
+  const val = parseFloat(document.getElementById("pt-input").value);
+  const out = document.getElementById("pt-out");
+  const hint = document.getElementById("pt-hint");
+  if(isNaN(val)){ out.textContent = "—"; hint.textContent=""; return; }
+
+  if(ref === "R454B"){
+    const bubble = pressureFromTempOrTemp("high", val, mode);
+    const dew = pressureFromTempOrTemp("low", val, mode);
+    if(mode === "t2p"){
+      out.textContent = `${bubble.toFixed(1)} / ${dew.toFixed(1)} PSIG`;
+      hint.textContent = "Bubble (liquid/condenser) / Dew (vapor/evaporator) — R-454B has real glide between the two.";
+    } else {
+      out.textContent = `${bubble.toFixed(1)} / ${dew.toFixed(1)} °F`;
+      hint.textContent = "Bubble point / Dew point temp at that pressure — R-454B has real glide between the two.";
+    }
+    return;
+  }
+
+  const table = tableFor(ref, "low");
+  const result = mode === "t2p" ? pressureFromTemp(table, val) : tempFromPressure(table, val);
+  out.textContent = mode === "t2p" ? `${result.toFixed(1)} PSIG` : `${result.toFixed(1)} °F`;
+  hint.textContent = "";
+}
+function pressureFromTempOrTemp(side, val, mode){
+  const table = tableFor("R454B", side);
+  return mode === "t2p" ? pressureFromTemp(table, val) : tempFromPressure(table, val);
+}
+
+// ---------- Service worker (offline) ----------
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
