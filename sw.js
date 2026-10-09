@@ -1,4 +1,4 @@
-const CACHE_NAME = "charge-check-v1";
+const CACHE_NAME = "charge-check-v2";
 const ASSETS = ["./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

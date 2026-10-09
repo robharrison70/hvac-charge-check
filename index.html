@@ -24,16 +24,17 @@
   h1{font-size:1.4rem; margin:4px 0 2px;}
   .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
   .tabs{display:flex; gap:6px; margin-bottom:16px; background:var(--panel); padding:4px; border-radius:12px;}
-  .tab{flex:1; text-align:center; padding:10px 6px; border-radius:9px; font-size:0.85rem; font-weight:600; color:var(--muted); cursor:pointer; user-select:none;}
+  .tab{flex:1; text-align:center; padding:10px 4px; border-radius:9px; font-size:0.8rem; font-weight:600; color:var(--muted); cursor:pointer; user-select:none;}
   .tab.active{background:var(--accent); color:#04141f;}
   .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:14px;}
   label{display:block; font-size:0.8rem; color:var(--muted); margin:12px 0 5px;}
   label:first-child{margin-top:0;}
-  select, input[type=number]{
+  select, input[type=number], input[type=text], textarea{
     width:100%; padding:12px; border-radius:10px; border:1px solid var(--border);
     background:var(--panel2); color:var(--text); font-size:1rem;
   }
-  select:focus, input:focus{outline:2px solid var(--accent);}
+  textarea{font-family:inherit; resize:vertical;}
+  select:focus, input:focus, textarea:focus{outline:2px solid var(--accent);}
   .row{display:flex; gap:10px;}
   .row > div{flex:1;}
   button.calc{
@@ -44,13 +45,28 @@
   .result{margin-top:14px; border-radius:12px; padding:16px; display:none;}
   .result.show{display:block;}
   .result .verdict{font-size:1.15rem; font-weight:800; margin-bottom:8px;}
-  .result .line{display:flex; justify-content:space-between; font-size:0.92rem; padding:4px 0; border-bottom:1px dashed rgba(255,255,255,0.08);}
-  .result .line:last-child{border-bottom:none;}
+  .line{display:flex; justify-content:space-between; font-size:0.92rem; padding:4px 0; border-bottom:1px dashed rgba(255,255,255,0.08);}
+  .line:last-child{border-bottom:none;}
   .result.good{background:rgba(52,211,153,0.12); border:1px solid var(--good);}
   .result.good .verdict{color:var(--good);}
   .result.bad{background:rgba(248,113,113,0.12); border:1px solid var(--bad);}
   .result.bad .verdict{color:var(--bad);}
   .hint{font-size:0.78rem; color:var(--muted); margin-top:10px; line-height:1.4;}
+  .savebox{margin-top:14px; padding-top:14px; border-top:1px solid var(--border);}
+  .savebox:empty{display:none;}
+  .chips{display:flex; gap:6px;}
+  .chip{flex:1; text-align:center; padding:10px 4px; border-radius:9px; border:1px solid var(--border); background:var(--panel2); color:var(--muted); font-size:0.78rem; font-weight:600; cursor:pointer; user-select:none;}
+  .chip.on{background:var(--accent); border-color:var(--accent); color:#04141f;}
+  .saved{font-weight:700; color:var(--good); text-align:center;}
+  .actions{display:flex; gap:10px; margin-bottom:14px;}
+  button.ghost{flex:1; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--panel); color:var(--text); font-size:0.9rem; font-weight:600; cursor:pointer;}
+  button.del{margin-top:12px; padding:8px 12px; border:1px solid var(--border); border-radius:9px; background:none; color:var(--muted); font-size:0.8rem; cursor:pointer;}
+  button.del.armed{border-color:var(--bad); color:var(--bad);}
+  .logtop{display:flex; justify-content:space-between; gap:10px; font-size:0.78rem; color:var(--muted);}
+  .logjob{font-weight:700; margin-top:6px;}
+  .logverdict{font-size:1.05rem; font-weight:800; margin:8px 0;}
+  .logverdict.good{color:var(--good);}
+  .logverdict.bad{color:var(--bad);}
   .lookup-out{margin-top:14px; font-size:1.6rem; font-weight:800; text-align:center; color:var(--accent);}
   .disclaimer{font-size:0.72rem; color:var(--muted); text-align:center; margin-top:24px; line-height:1.5;}
   footer{text-align:center; color:var(--muted); font-size:0.72rem; margin-top:10px;}
@@ -65,10 +81,11 @@
   <div class="tab active" data-tab="fo">Fixed Orifice</div>
   <div class="tab" data-tab="txv">TXV</div>
   <div class="tab" data-tab="pt">PT Lookup</div>
+  <div class="tab" data-tab="log" id="log-tab">Log</div>
 </div>
 
 <!-- Refrigerant picker shared across tabs -->
-<div class="card">
+<div class="card" id="ref-card">
   <label for="refrigerant">Refrigerant</label>
   <select id="refrigerant">
     <option value="R410A">R-410A</option>
@@ -102,6 +119,7 @@
 
     <button class="calc" onclick="calcFO()">Calculate Superheat</button>
     <div class="result" id="fo-result"></div>
+    <div class="savebox" id="fo-save"></div>
     <div class="hint">Fixed orifice / piston metering devices. Target superheat is refrigerant-independent — it's driven by indoor wet bulb and outdoor dry bulb.</div>
   </div>
 </div>
@@ -120,6 +138,7 @@
 
     <button class="calc" onclick="calcTXV()">Calculate Subcooling</button>
     <div class="result" id="txv-result"></div>
+    <div class="savebox" id="txv-save"></div>
     <div class="hint">TXV / EEV metering devices. Target subcooling is manufacturer-specified (commonly 8–12°F) — use the data plate value when you've got it, not the 10°F default.</div>
   </div>
 </div>
@@ -137,6 +156,16 @@
     <div class="lookup-out" id="pt-out">—</div>
     <div class="hint" id="pt-hint"></div>
   </div>
+</div>
+
+<!-- JOB LOG -->
+<div class="panel" id="panel-log" style="display:none;">
+  <div class="actions" id="log-actions">
+    <button class="ghost" id="log-share" onclick="shareLog()">Share log</button>
+    <button class="ghost" onclick="downloadLog()">Download CSV</button>
+  </div>
+  <div id="log-list"></div>
+  <div class="hint">Saved on this phone only. Clearing the browser's site data erases it, so share or download the log first.</div>
 </div>
 
 <div class="disclaimer">
@@ -193,11 +222,12 @@ function pressureFromTemp(table, tempF){ return interp(table, tempF, 0, 1); }
 
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab");
-const panels = { fo: document.getElementById("panel-fo"), txv: document.getElementById("panel-txv"), pt: document.getElementById("panel-pt") };
+const panels = { fo: document.getElementById("panel-fo"), txv: document.getElementById("panel-txv"), pt: document.getElementById("panel-pt"), log: document.getElementById("panel-log") };
 tabs.forEach(t => t.addEventListener("click", () => {
   tabs.forEach(x=>x.classList.remove("active"));
   t.classList.add("active");
   Object.keys(panels).forEach(k => panels[k].style.display = (k === t.dataset.tab) ? "block" : "none");
+  document.getElementById("ref-card").style.display = (t.dataset.tab === "log") ? "none" : "block";
 }));
 
 // ---------- Fixed orifice / superheat ----------
@@ -212,6 +242,7 @@ function calcFO(){
   if([lowside,suctemp,wb,db].some(v => isNaN(v))){
     box.className = "result show bad";
     box.innerHTML = "<div class='verdict'>Fill in all four fields</div>";
+    document.getElementById("fo-save").innerHTML = "";
     return;
   }
 
@@ -235,6 +266,11 @@ function calcFO(){
     <div class="line"><span>Target superheat</span><span>${targetSH.toFixed(1)}°F</span></div>
     <div class="line"><span>Difference</span><span>${diff>0?"+":""}${diff.toFixed(1)}°F</span></div>
   `;
+
+  lastCalc.fo = { type:"fo", refLabel:refLabel(), pressure:lowside, lineTemp:suctemp, wb:wb, db:db,
+    sat:evapSat, actual:actualSH, target:targetSH, diff:diff,
+    app: Math.abs(diff) <= margin ? "correct" : (diff > margin ? "under" : "over"), tech:"" };
+  showSaveForm("fo");
 }
 
 // ---------- TXV / subcooling ----------
@@ -248,6 +284,7 @@ function calcTXV(){
   if([highside,liqtemp,target].some(v => isNaN(v))){
     box.className = "result show bad";
     box.innerHTML = "<div class='verdict'>Fill in all fields</div>";
+    document.getElementById("txv-save").innerHTML = "";
     return;
   }
 
@@ -270,6 +307,11 @@ function calcTXV(){
     <div class="line"><span>Target subcooling</span><span>${target.toFixed(1)}°F</span></div>
     <div class="line"><span>Difference</span><span>${diff>0?"+":""}${diff.toFixed(1)}°F</span></div>
   `;
+
+  lastCalc.txv = { type:"txv", refLabel:refLabel(), pressure:highside, lineTemp:liqtemp,
+    sat:condSat, actual:actualSC, target:target, diff:diff,
+    app: Math.abs(diff) <= margin ? "correct" : (diff < -margin ? "under" : "over"), tech:"" };
+  showSaveForm("txv");
 }
 
 // ---------- PT lookup ----------
@@ -312,6 +354,165 @@ function pressureFromTempOrTemp(side, val, mode){
   const table = tableFor("R454B", side);
   return mode === "t2p" ? pressureFromTemp(table, val) : tempFromPressure(table, val);
 }
+
+// ---------- Job log (saved on this device only) ----------
+const LOG_KEY = "chargecheck.log.v1";
+const APP_LABELS = { correct: "Charge looks correct", under: "Likely UNDERCHARGED", over: "Likely OVERCHARGED" };
+const TECH_LABELS = { right: "App was right", wrong: "App was wrong", unsure: "Not sure yet" };
+const lastCalc = {};
+let delArmed = "";
+
+function loadLog(){
+  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e){ return []; }
+}
+function storeLog(log){
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); return true; } catch(e){ return false; }
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function signed(n){ return (n>0?"+":"") + n.toFixed(1); }
+function refLabel(){
+  const sel = document.getElementById("refrigerant");
+  return sel.options[sel.selectedIndex].text;
+}
+function techChips(selected, call){
+  // call is the start of the onclick, e.g. "pickTech('fo'," — the chip's key gets appended
+  return `<div class="chips">` + Object.keys(TECH_LABELS).map(k =>
+    `<div class="chip${k===selected?" on":""}" onclick="${call}'${k}')">${TECH_LABELS[k]}</div>`).join("") + `</div>`;
+}
+
+function showSaveForm(kind){
+  document.getElementById(kind+"-save").innerHTML = `
+    <label for="${kind}-job">Job / unit (optional)</label>
+    <input type="text" id="${kind}-job" placeholder="e.g. Smith, 3-ton Goodman" />
+    <label>Did the app get it right?</label>
+    ${techChips("", `pickTech('${kind}',`)}
+    <label for="${kind}-note">Notes (optional)</label>
+    <textarea id="${kind}-note" rows="2" placeholder="What you actually found, anything that bugged you"></textarea>
+    <button class="calc" onclick="saveJob('${kind}')">Save to Job Log</button>
+    <div class="hint" id="${kind}-savemsg"></div>
+  `;
+}
+function pickTech(kind, val){
+  const c = lastCalc[kind];
+  c.tech = (c.tech === val) ? "" : val;
+  document.querySelectorAll(`#${kind}-save .chip`).forEach((el,i) =>
+    el.classList.toggle("on", Object.keys(TECH_LABELS)[i] === c.tech));
+}
+function saveJob(kind){
+  const entry = Object.assign({}, lastCalc[kind], {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    ts: new Date().toISOString(),
+    job: document.getElementById(kind+"-job").value.trim(),
+    note: document.getElementById(kind+"-note").value.trim()
+  });
+  const log = loadLog();
+  log.unshift(entry);
+  if(!storeLog(log)){
+    document.getElementById(kind+"-savemsg").textContent = "Couldn't save — this browser is blocking storage (private mode?).";
+    return;
+  }
+  document.getElementById(kind+"-save").innerHTML = "<div class='saved'>Saved to Job Log ✓</div>";
+  renderLog();
+}
+
+function updateJob(id, field, val){
+  const log = loadLog();
+  const e = log.find(x => x.id === id);
+  if(!e) return;
+  e[field] = val;
+  storeLog(log);
+}
+function setTech(id, val){
+  const e = loadLog().find(x => x.id === id);
+  updateJob(id, "tech", (e && e.tech === val) ? "" : val);
+  renderLog();
+}
+function delJob(id){
+  // two taps instead of a confirm dialog
+  if(delArmed !== id){ delArmed = id; renderLog(); return; }
+  delArmed = "";
+  storeLog(loadLog().filter(e => e.id !== id));
+  renderLog();
+}
+
+function fmtWhen(ts){
+  return new Date(ts).toLocaleString([], {month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit"});
+}
+function renderLog(){
+  const log = loadLog();
+  document.getElementById("log-tab").textContent = log.length ? `Log (${log.length})` : "Log";
+  document.getElementById("log-actions").style.display = log.length ? "flex" : "none";
+  document.getElementById("log-share").style.display = navigator.share ? "block" : "none";
+  const list = document.getElementById("log-list");
+  if(!log.length){
+    list.innerHTML = `<div class="card">No saved jobs yet. Run a calculation, then tap "Save to Job Log".</div>`;
+    return;
+  }
+  list.innerHTML = log.map(e => {
+    const fo = e.type === "fo";
+    const inputs = fo ? `
+      <div class="line"><span>Low side</span><span>${e.pressure} PSIG</span></div>
+      <div class="line"><span>Suction line temp</span><span>${e.lineTemp}°F</span></div>
+      <div class="line"><span>Indoor wet bulb</span><span>${e.wb}°F</span></div>
+      <div class="line"><span>Outdoor dry bulb</span><span>${e.db}°F</span></div>` : `
+      <div class="line"><span>High side</span><span>${e.pressure} PSIG</span></div>
+      <div class="line"><span>Liquid line temp</span><span>${e.lineTemp}°F</span></div>`;
+    return `
+    <div class="card">
+      <div class="logtop"><span>${fmtWhen(e.ts)}</span><span>${fo?"Fixed orifice":"TXV"} · ${esc(e.refLabel)}</span></div>
+      ${e.job ? `<div class="logjob">${esc(e.job)}</div>` : ""}
+      <div class="logverdict ${e.app==="correct"?"good":"bad"}">${APP_LABELS[e.app]}</div>
+      ${inputs}
+      <div class="line"><span>${fo?"Evaporator":"Condenser"} sat. temp</span><span>${e.sat.toFixed(1)}°F</span></div>
+      <div class="line"><span>Actual ${fo?"superheat":"subcooling"}</span><span>${e.actual.toFixed(1)}°F</span></div>
+      <div class="line"><span>Target ${fo?"superheat":"subcooling"}</span><span>${e.target.toFixed(1)}°F</span></div>
+      <div class="line"><span>Difference</span><span>${signed(e.diff)}°F</span></div>
+      <label>Did the app get it right?</label>
+      ${techChips(e.tech, `setTech('${e.id}',`)}
+      <label for="note-${e.id}">Notes</label>
+      <textarea id="note-${e.id}" rows="2" onchange="updateJob('${e.id}','note',this.value.trim())">${esc(e.note)}</textarea>
+      <button class="del${delArmed===e.id?" armed":""}" onclick="delJob('${e.id}')">${delArmed===e.id?"Tap again to delete":"Delete"}</button>
+    </div>`;
+  }).join("");
+}
+
+function logText(){
+  return loadLog().map(e => {
+    const fo = e.type === "fo";
+    return [
+      `${fmtWhen(e.ts)} · ${fo?"Fixed orifice":"TXV"} · ${e.refLabel}${e.job ? " · "+e.job : ""}`,
+      fo ? `Low side ${e.pressure} PSIG, suction ${e.lineTemp}°F, indoor WB ${e.wb}°F, outdoor DB ${e.db}°F`
+         : `High side ${e.pressure} PSIG, liquid ${e.lineTemp}°F`,
+      `${fo?"Superheat":"Subcooling"} ${e.actual.toFixed(1)}°F vs target ${e.target.toFixed(1)}°F (${signed(e.diff)}°F)`,
+      `App: ${APP_LABELS[e.app]} · Tech: ${TECH_LABELS[e.tech] || "not marked"}`,
+      e.note ? `Notes: ${e.note}` : ""
+    ].filter(Boolean).join("\n");
+  }).join("\n\n");
+}
+function logCsv(){
+  const cols = ["saved_at","job","type","refrigerant","pressure_psig","line_temp_f","indoor_wb_f","outdoor_db_f","sat_temp_f","actual_f","target_f","diff_f","app_verdict","tech_verdict","notes"];
+  const q = v => `"${String(v == null ? "" : v).replace(/"/g,'""')}"`;
+  const rows = loadLog().map(e => [
+    fmtWhen(e.ts), e.job, e.type === "fo" ? "fixed orifice superheat" : "TXV subcooling", e.refLabel,
+    e.pressure, e.lineTemp, e.wb, e.db, e.sat.toFixed(1), e.actual.toFixed(1), e.target.toFixed(1), e.diff.toFixed(1),
+    e.app, e.tech, e.note
+  ].map(q).join(","));
+  return [cols.join(",")].concat(rows).join("\r\n");
+}
+function shareLog(){
+  navigator.share({ title: "Charge Check job log", text: logText() }).catch(()=>{});
+}
+function downloadLog(){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([logCsv()], {type:"text/csv"}));
+  a.download = "charge-check-log-" + new Date().toISOString().slice(0,10) + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+renderLog();
 
 // ---------- Service worker (offline) ----------
 if("serviceWorker" in navigator){
