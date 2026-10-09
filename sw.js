@@ -1,5 +1,5 @@
-const CACHE_NAME = "charge-check-v2";
-const ASSETS = ["./index.html", "./manifest.json", "./icon.svg"];
+const CACHE_NAME = "charge-check-v3";
+const ASSETS = ["./index.html", "./manifest.json", "./icon.svg", "./apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));

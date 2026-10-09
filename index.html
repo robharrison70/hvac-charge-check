@@ -6,7 +6,7 @@
 <title>Charge Check</title>
 <link rel="manifest" href="./manifest.json" />
 <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="./icon.svg" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="theme-color" content="#0b1220" />
@@ -20,6 +20,7 @@
     margin:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     padding:16px 16px 48px; max-width:520px; margin-inline:auto;
+    padding-top:max(16px, env(safe-area-inset-top)); padding-bottom:max(48px, env(safe-area-inset-bottom));
   }
   h1{font-size:1.4rem; margin:4px 0 2px;}
   .sub{color:var(--muted); font-size:0.85rem; margin-bottom:18px;}
@@ -162,10 +163,10 @@
 <div class="panel" id="panel-log" style="display:none;">
   <div class="actions" id="log-actions">
     <button class="ghost" id="log-share" onclick="shareLog()">Share log</button>
-    <button class="ghost" onclick="downloadLog()">Download CSV</button>
+    <button class="ghost" onclick="downloadLog()">Export CSV</button>
   </div>
   <div id="log-list"></div>
-  <div class="hint">Saved on this phone only. Clearing the browser's site data erases it, so share or download the log first.</div>
+  <div class="hint">Saved on this phone only. Clearing the browser's site data erases it, so share or export the log first.</div>
 </div>
 
 <div class="disclaimer">
@@ -505,9 +506,16 @@ function shareLog(){
   navigator.share({ title: "Charge Check job log", text: logText() }).catch(()=>{});
 }
 function downloadLog(){
+  const name = "charge-check-log-" + new Date().toISOString().slice(0,10) + ".csv";
+  // iPhone/iPad home-screen apps can't reliably save a download link, so hand the file to the share sheet there
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if(ios && window.File && navigator.canShare){
+    const file = new File([logCsv()], name, {type:"text/csv"});
+    if(navigator.canShare({files:[file]})){ navigator.share({files:[file]}).catch(()=>{}); return; }
+  }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([logCsv()], {type:"text/csv"}));
-  a.download = "charge-check-log-" + new Date().toISOString().slice(0,10) + ".csv";
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   a.remove();
